@@ -1,0 +1,22 @@
+how_many_scans: 100  # how many photos in a pile
+motor_only: False  # when True - only motor is active and no image capture or processing is done. Useful when recording a video
+camera:
+  dummy: False  # use True for mocking the camera
+  dummy_dir: /home/gleb/Desktop/images  # mock photos dir
+  # where the android saves the photos
+  android_image_dir: '/run/user/1000/gvfs/mtp:host=Xiaomi_ATOLL-AB-IDP__SN%3AA3530764_def7d146/Internal shared storage/DCIM/Camera'
+  # where is the 'capture' button from the android camera located on the pc screen
+  capture_mouse_click_position: [450, 780]
+image_processor:
+  # size of images that the android camera captures
+  input_image_shape: [1080, 1440, 3]
+  # corners of the image once it lies on the stand
+  mask_corners:
+  - [140, 386]
+  - [887, 407]
+  - [854, 1244]
+  - [109, 1235]
+  # optional factors for correcting whitebalance in post processing; keep '1's if you have already white balanced on the phone
+  rgb_correction_factors: [1, 1, 1]
+  # optional shift the scanned photo position in the output image
+  output_shift: [300, 500]

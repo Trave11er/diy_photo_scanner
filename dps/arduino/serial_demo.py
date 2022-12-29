@@ -1,0 +1,166 @@
+# the code below has been adapted from https://forum.arduino.cc/t/demo-of-pc-arduino-comms-using-python/219184/5
+
+# 19 July 2014
+# 08 Dec 2016 - updated for Python3
+
+# in case any of this upsets Python purists it has been converted from an equivalent JRuby program
+
+# this is designed to work with ... ArduinoPC2.ino ...
+
+# the purpose of this program and the associated Arduino program is to demonstrate a system for sending
+#   and receiving data between a PC and an Arduino.
+
+# The key functions are:
+#    sendToArduino(str) which sends the given string to the Arduino. The string may
+#                       contain characters with any of the values 0 to 255
+#
+#    recvFromArduino()  which returns an array.
+#                         The first element contains the number of bytes that the Arduino said it included in
+#                             message. This can be used to check that the full message was received.
+#                         The second element contains the message as a string
+
+
+# the overall process followed by the demo program is as follows
+#   open the serial connection to the Arduino - which causes the Arduino to reset
+#   wait for a message from the Arduino to give it time to reset
+#   loop through a series of test messages
+#      send a message and display it on the PC screen
+#      wait for a reply and display it on the PC
+
+# to facilitate debugging the Arduino code this program interprets any message from the Arduino
+#    with the message length set to 0 as a debug message which is displayed on the PC screen
+
+# the message to be sent to the Arduino starts with < and ends with >
+#    the message content comprises a string, an integer and a float
+#    the numbers are sent as their ascii equivalents
+#    for example <MOTOR_ID,200,0.2>
+#    this means set the flash interval for MOTOR_ID to 200 millisecs
+#      and move the servo to 20% of its range
+
+# receiving a message from the Arduino involves
+#    waiting until the startMarker is detected
+#    saving all subsequent bytes until the end marker is detected
+
+# NOTES
+#       this program does not include any timeouts to deal with delays in communication
+#
+#       for simplicity the program does NOT search for the comm port - the user must modify the
+#         code to include the correct reference.
+#         search for the lines
+#               serPort = "/dev/ttyS80"
+#               baudRate = 9600
+#               ser = serial.Serial(serPort, baudRate)
+#
+
+import serial
+
+# =====================================
+
+#  Function Definitions
+
+# =====================================
+
+
+def sendToArduino(sendStr):
+    ser.write(sendStr.encode('utf-8'))  # change for Python3
+
+
+# ======================================
+
+def recvFromArduino():
+    global startMarker, endMarker
+
+    ck = ""
+    x = "z"  # any value that is not an end- or startMarker
+    byteCount = -1  # to allow for the fact that the last increment will be one too many
+
+    # wait for the start character
+    while ord(x) != startMarker:
+        x = ser.read()
+
+    # save data until the end marker is found
+    while ord(x) != endMarker:
+        if ord(x) != startMarker:
+            ck = ck + x.decode("utf-8")  # change for Python3
+            byteCount += 1
+        x = ser.read()
+
+    return(ck)
+
+
+# ============================
+
+def waitForArduino():
+
+    # wait until the Arduino sends 'Arduino Ready' - allows time for Arduino reset
+    # it also ensures that any bytes left over from a previous message are discarded
+
+    global startMarker, endMarker
+
+    msg = ""
+    while msg.find("Arduino is ready") == -1:
+
+        while ser.inWaiting() == 0:
+            pass
+
+        msg = recvFromArduino()
+
+        print(msg)
+
+# ======================================
+
+
+def runTest(td):
+    numLoops = len(td)
+    waitingForReply = False
+
+    n = 0
+    while n < numLoops:
+        teststr = td[n]
+
+        if waitingForReply is False:
+            sendToArduino(teststr)
+            print("Sent from PC -- LOOP NUM " + str(n) + " TEST STR " + teststr)
+            waitingForReply = True
+
+        if waitingForReply is True:
+
+            while ser.inWaiting() == 0:
+                pass
+
+            dataRecvd = recvFromArduino()
+            print("Reply Received  " + dataRecvd)
+            n += 1
+            waitingForReply = False
+
+# ======================================
+
+# THE DEMO PROGRAM STARTS HERE
+
+# ======================================
+
+
+# The motor_write_sleep and num_motor_moves are specific to the setup at hand and may need adjusting
+def main(motor_write_sleep=3, num_motor_moves=1750):
+    global ser, startMarker, endMarker
+    startMarker = 60
+    endMarker = 62
+
+    serPort = "/dev/ttyACM0"
+    baudRate = 9600
+    ser = serial.Serial(serPort, baudRate)
+    print("Serial port " + serPort + " opened  Baudrate " + str(baudRate))
+
+    waitForArduino()  # Wait for <Arduino is ready>
+
+    data = f'<MOTOR_ID,{motor_write_sleep},{num_motor_moves}>s'
+    testData = []
+    testData.append(data)
+
+    runTest(testData)
+
+    ser.close()
+
+
+if __name__ == '__main__':
+    main()
